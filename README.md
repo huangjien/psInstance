@@ -1,4 +1,4 @@
-# psInstance
+# Python Selenium Instance
 **tags**: python selenium instance
 
 
