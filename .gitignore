@@ -127,3 +127,14 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# JetBrains
+*.ipr
+*.iws
+*.xws
+*.iws[0-9]
+*.xws[0-9]
+*.idea
+*.pycharm
+*.eclipse
+.idea/
