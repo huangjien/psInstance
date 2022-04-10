@@ -46,7 +46,7 @@ class SettingModel(BaseModel):
 async def create_setting(setting: SettingModel = Body(..., embed=True)):
     setting = jsonable_encoder(setting)
     new_setting = await db.settings.insert_one(setting)
-    created_setting = await db.settings.find_one({"_id": new_setting.inserted_id})
+    created_setting = await db.settings.find_one({"name": new_setting.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_setting)
 
 
