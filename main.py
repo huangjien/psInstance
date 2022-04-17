@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, EmailStr
 from bson import ObjectId
 from typing import Optional, List
 import motor.motor_asyncio
+from cachetools import cached, LRUCache, TTLCache
 
 MONGO_DETAILS = "mongodb://localhost:27017"
 
@@ -50,12 +51,14 @@ async def create_setting(setting: SettingModel = Body(..., embed=True)):
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_setting)
 
 
+@cached(cache=TTLCache(maxsize=1, ttl=600))
 @app.get("/setting/", response_model=List[SettingModel])
 async def get_settings():
     settings = await db.settings.find().to_list(None)
     return settings
 
 
+@cached(cache=TTLCache(maxsize=64, ttl=600))
 @app.get("/setting/{setting_id}", response_model=SettingModel)
 async def get_setting(setting_id: str):
     if (setting := await db.settings.find_one({"name": setting_id})) is not None:
