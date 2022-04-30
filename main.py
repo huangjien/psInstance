@@ -1,67 +1,56 @@
-import os
+from urllib.request import Request
+
+import uvicorn as uvicorn
+from cachetools.func import ttl_cache
 from fastapi import FastAPI, Body, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, Field, EmailStr
-from bson import ObjectId
-from typing import Optional, List
+from typing import List
+from decouple import config
 import motor.motor_asyncio
-from cachetools import cached, LRUCache, TTLCache
 
-MONGO_DETAILS = "mongodb://localhost:27017"
+from model import SettingModel
+
+# settings section
+PORT = config('PORT', default=8000, cast=int)
+HOST = config('HOST', default="0.0.0.0")
+DB_NAME = config('DB_NAME', default='test')
+MONGO_URL = config("MONGO_URL", default="mongodb://localhost:27017")
 
 app = FastAPI()
-client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_DETAILS)
-db = client.test
 
 
-class PyObjectId(ObjectId):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid objectid")
-        return ObjectId(v)
-
-    @classmethod
-    def __modify_schema__(cls, field_schema):
-        field_schema.update(type="string")
+async def open_db() -> motor.motor_asyncio.AsyncIOMotorClient:
+    app.state.mongodb = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URL)[DB_NAME]
 
 
-class SettingModel(BaseModel):
-    name: str = Field(..., index=True)
-    value: str = Field(...)
-    category: str = Field(..., index=True)
-    description: str = Field(...)
+async def close_db():
+    app.state.mongodb.close()
 
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+
+app.add_event_handler('startup', open_db)
+app.add_event_handler('shutdown', close_db)
 
 
 @app.post("/setting/", response_model=SettingModel)
 async def create_setting(setting: SettingModel = Body(..., embed=True)):
     setting = jsonable_encoder(setting)
-    new_setting = await db.settings.insert_one(setting)
-    created_setting = await db.settings.find_one({"name": new_setting.inserted_id})
+    new_setting = await app.state.mongodb.settings.insert_one(setting)
+    created_setting = await app.state.mongodb.settings.find_one({"name": new_setting.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_setting)
 
 
-@cached(cache=TTLCache(maxsize=1, ttl=600))
+@ttl_cache(maxsize=64, ttl=600)
 @app.get("/setting/", response_model=List[SettingModel])
 async def get_settings():
-    settings = await db.settings.find().to_list(None)
+    settings = await app.state.mongodb.settings.find().to_list(None)
     return settings
 
 
-@cached(cache=TTLCache(maxsize=64, ttl=600))
+@ttl_cache(maxsize=64, ttl=600)
 @app.get("/setting/{setting_id}", response_model=SettingModel)
 async def get_setting(setting_id: str):
-    if (setting := await db.settings.find_one({"name": setting_id})) is not None:
+    if (setting := await app.state.mongodb.settings.find_one({"name": setting_id})) is not None:
         return setting
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Setting {setting_id} not found")
 
@@ -69,3 +58,7 @@ async def get_setting(setting_id: str):
 @app.get("/")
 async def root():
     return {"status": "SUCCESS"}
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host=HOST, port=PORT)
