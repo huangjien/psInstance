@@ -4,6 +4,9 @@ services:
 
   application:
     build: .
+    environment:
+      - MONGO_URL=mongodb://db:27017
+      - DB_NAME=test
     ports:
       - "8080:8080"
     volumes:

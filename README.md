@@ -1,5 +1,5 @@
 # psInstance
-**tags**: python selenium instance
+**tags**: python deployment instance
 
 
 ## Start web
