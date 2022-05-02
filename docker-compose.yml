@@ -4,6 +4,7 @@ services:
 
   application:
     build: .
+    container_name: application
     environment:
       - MONGO_URL=mongodb://db:27017
       - DB_NAME=test
@@ -16,5 +17,6 @@ services:
   
   db:
     image: mongo
+    container_name: db
     ports:
       - "27017:27017"

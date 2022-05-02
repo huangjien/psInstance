@@ -1,18 +1,15 @@
 from typing import List
-
 from cachetools.func import ttl_cache
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.encoders import jsonable_encoder
 from starlette import status
-
 from db.model import SettingModel, DBConnection
 
-# from main import app
 
 router = APIRouter()
 
 
-@router.post("/setting/", response_model=SettingModel)
+@router.post("/create/", response_model=SettingModel)
 async def create_setting(setting: SettingModel = Body(..., embed=True)):
     setting = jsonable_encoder(setting)
     await DBConnection.instance().db.settings.insert_one(setting)
@@ -20,16 +17,38 @@ async def create_setting(setting: SettingModel = Body(..., embed=True)):
     return created_setting
 
 
+@router.put("/update/{name}", response_model=SettingModel)
+async def update_setting(name: str, setting: SettingModel = Body(..., embed=True)):
+    setting = jsonable_encoder(setting)
+    await DBConnection.instance().db.settings.update_one({"name": name}, {"$set": setting})
+    updated_setting = await DBConnection.instance().db.settings.find_one({"_id": name})
+    return updated_setting
+
+
+@router.delete("/delete/{name}", response_model=SettingModel)
+async def delete_setting(name: str):
+    await DBConnection.instance().db.settings.delete_one({"name": name})
+    return {"name": name, "deleted": True}
+
+
 @ttl_cache(maxsize=64, ttl=600)
-@router.get("/settings/", response_model=List[SettingModel])
+@router.get("/list/", response_model=List[SettingModel])
 async def get_settings():
     settings = await DBConnection.instance().db.settings.find().to_list(None)
     return settings
 
 
 @ttl_cache(maxsize=64, ttl=600)
-@router.get("/setting/{setting_id}", response_model=SettingModel)
-async def get_setting(setting_id: str):
-    if (setting := await DBConnection.instance().db.settings.find_one({"name": setting_id})) is not None:
+@router.get("/name/{setting_id}", response_model=SettingModel)
+async def get_setting_by_name(name: str):
+    if (setting := await DBConnection.instance().db.settings.find_one({"name": name})) is not None:
         return setting
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Setting {setting_id} not found")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Setting by name {name} not found")
+
+
+@ttl_cache(maxsize=64, ttl=600)
+@router.get("/category/{category}", response_model=SettingModel)
+async def get_setting_by_category(category: str):
+    if (setting := await DBConnection.instance().db.settings.find_one({"category": category})) is not None:
+        return setting
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Setting by category {category} not found")

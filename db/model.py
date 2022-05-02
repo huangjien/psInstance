@@ -1,9 +1,8 @@
 from typing import Optional
-
 import motor
 from bson import ObjectId
 from decouple import config
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from bson.objectid import ObjectId as BSONObjectId
 
 DB_NAME = config('DB_NAME', default='test')
@@ -22,7 +21,7 @@ class Singleton:
             return self._instance
 
     def __call__(self):
-        raise TypeError('Singletons must be accessed through `Instance()`.')
+        raise TypeError('Singletons must be accessed through `instance()`.')
 
     def __instancecheck__(self, inst):
         return isinstance(inst, self._cls)
@@ -72,9 +71,11 @@ class SettingModel(BaseModel):
 
 # Deployment data model
 class DeploymentModel(BaseModel):
-    name: str = Field(..., index=True)
+    name: str = Field(..., index=True)  # name of the deployment, usually the name of the machine
+    url: str = Field(..., index=True)  # url of the deployment
+    osinfo: list[dict] = Field(...)  # os info of the deployment
     description: str = Field(...)
-    owners: list = Field(...)
-    softwares: list = Field(...)
-    environments: Optional[dict] = Field(None)
-    status: dict = Field(...)
+    owners: list[EmailStr] = Field(...)
+    softwares: list[dict] = Field(...)
+    environments: Optional[list[dict]] = Field(None)
+    status: list[dict] = Field(...)
