@@ -1,22 +1,22 @@
 from typing import List
-
-from cachetools.func import ttl_cache
 from fastapi import APIRouter, HTTPException
 from starlette import status
-from db.model import DeploymentModel, DBConnection
 
+from db.model import DeploymentModel, DBConnection, cacheable, timed_lru_cache
 
 router = APIRouter()
 
 
-@ttl_cache(maxsize=64, ttl=600)
+@timed_lru_cache
+@cacheable
 @router.get("/deployments/", response_model=List[DeploymentModel])
 async def get_deployments():
     settings = await DBConnection.instance().db.deployments.find().to_list(None)
     return settings
 
 
-@ttl_cache(maxsize=64, ttl=600)
+@timed_lru_cache
+@cacheable
 @router.get("/deployment/{name}", response_model=DeploymentModel)
 async def get_deployment(name: str):
     if (setting := await DBConnection().instance().db.deployments.find_one({"name": name})) is not None:

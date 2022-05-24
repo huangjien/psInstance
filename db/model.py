@@ -1,3 +1,6 @@
+import asyncio
+from datetime import datetime
+from functools import lru_cache, wraps
 from typing import Optional
 import motor
 from bson import ObjectId
@@ -7,6 +10,42 @@ from bson.objectid import ObjectId as BSONObjectId
 
 DB_NAME = config('DB_NAME', default='test')
 MONGO_URL = config("MONGO_URL", default="mongodb://localhost:27017")
+
+class Cacheable:
+    def __init__(self, co):
+        self.co = co
+        self.done = False
+        self.result = None
+        self.lock = asyncio.Lock()
+
+    def __await__(self):
+        while (yield from self.lock):
+            if self.done:
+                return self.result
+            self.result = yield from self.co.__await__()
+            self.done = True
+            return self.result
+
+def cacheable(f):
+    def wrapper(*args, **kwargs):
+        return Cacheable(f(*args, **kwargs))
+    return wrapper
+
+
+def timed_lru_cache(seconds: int = 300, maxsize: int = 128):
+    def wrapper_cache(f):
+        f = lru_cache(maxsize = maxsize)(f)
+        f.life_time = datetime.timedelta(seconds = seconds)
+        f.expiration = datetime.utcnow() + f.life_time
+
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if datetime.utcnow() > f.expiration:
+                f.cache_clear()
+                f.expiration = datetime.utcnow() + f.life_time
+            return f(*args, **kwargs)
+        return wrapper
+    return wrapper_cache
 
 
 class Singleton:

@@ -1,10 +1,8 @@
 from typing import List
-from cachetools.func import ttl_cache
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.encoders import jsonable_encoder
 from starlette import status
-from db.model import SettingModel, DBConnection
-
+from db.model import SettingModel, DBConnection, timed_lru_cache, cacheable
 
 router = APIRouter()
 
@@ -31,14 +29,16 @@ async def delete_setting(name: str):
     return {"name": name, "deleted": True}
 
 
-@ttl_cache(maxsize=64, ttl=600)
+@timed_lru_cache
+@cacheable
 @router.get("/list/", response_model=List[SettingModel])
 async def get_settings():
     settings = await DBConnection.instance().db.settings.find().to_list(None)
     return settings
 
 
-@ttl_cache(maxsize=64, ttl=600)
+@timed_lru_cache
+@cacheable
 @router.get("/name/{setting_id}", response_model=SettingModel)
 async def get_setting_by_name(name: str):
     if (setting := await DBConnection.instance().db.settings.find_one({"name": name})) is not None:
@@ -46,7 +46,8 @@ async def get_setting_by_name(name: str):
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Setting by name {name} not found")
 
 
-@ttl_cache(maxsize=64, ttl=600)
+@timed_lru_cache
+@cacheable
 @router.get("/category/{category}", response_model=SettingModel)
 async def get_setting_by_category(category: str):
     if (setting := await DBConnection.instance().db.settings.find_one({"category": category})) is not None:
